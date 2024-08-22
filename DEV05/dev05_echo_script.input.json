@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "properties": {
+    "echo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "echo"
+  ],
+  "type": "object"
+}

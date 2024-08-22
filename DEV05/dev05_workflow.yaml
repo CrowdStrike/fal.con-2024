@@ -1,0 +1,72 @@
+# This is an exported workflow. Editing this file is not recommended.
+
+name: dev05_workflow
+trigger:
+    next:
+        - direct_log_is_equal_to_yes_echo_exists_e517bc86
+    name: On demand
+    parameters:
+        properties:
+            device_id:
+                type: string
+                format: aid
+            direct_log:
+                type: boolean
+            echo:
+                type: string
+            platform_name:
+                type: string
+                format: platform
+            search:
+                type: boolean
+        type: object
+actions:
+    dev05_echo_script_323e0e53:
+        next:
+            - write_to_log_repo_35b95459
+        id: b7cc87abbd344a5e8c092765dbaa605d_27a4b5b3569011efb5f65e66a2056dff_465fa8ac686d46919da4d226d9ea2fc7
+        properties:
+            device_id: ${device_id}
+            echo: ${echo}
+    event_query___associateindicator_24h_1a4d1631:
+        id: b7cc87abbd344a5e8c092765dbaa605d_b7cc87abbd344a5e8c092765dbaa605d_a6a2afb582d34160a1cdf19a84f343f8
+        properties:
+            aid: ${device_id}
+    write_to_log_repo_35b95459:
+        id: 04c59ceb6dff9e6cd89e5f5cf13121ab
+        properties:
+            _fields:
+                - ${device_id}
+                - ${dev05_echo_script_323e0e53.RTR.Custom_dev05_echo_script.result}
+            remove_action_prefix: true
+    write_to_log_repo_b9ab4ea7:
+        id: 04c59ceb6dff9e6cd89e5f5cf13121ab
+        properties:
+            _fields:
+                - ${echo}
+            remove_action_prefix: true
+conditions:
+    device_id_exists_platform_name_is_equal_to_windows_echo_exists_fe009e0b:
+        next:
+            - dev05_echo_script_323e0e53
+        expression: device_id:!null+platform_name:'Windows'+echo:!null
+        display:
+            - Device id exists
+            - Platform name is equal to Windows
+            - Echo exists
+        else_if: device_id_exists_search_is_equal_to_yes_0cad6c8b
+    device_id_exists_search_is_equal_to_yes_0cad6c8b:
+        next:
+            - event_query___associateindicator_24h_1a4d1631
+        expression: device_id:!null+search:true
+        display:
+            - Device id exists
+            - Search is equal to Yes
+    direct_log_is_equal_to_yes_echo_exists_e517bc86:
+        next:
+            - write_to_log_repo_b9ab4ea7
+        expression: direct_log:true+echo:!null
+        display:
+            - Direct log is equal to Yes
+            - Echo exists
+        else_if: device_id_exists_platform_name_is_equal_to_windows_echo_exists_fe009e0b
