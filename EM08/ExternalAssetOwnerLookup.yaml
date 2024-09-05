@@ -1,0 +1,287 @@
+name: External Asset Owner Lookup
+description: FEM-DEMO-SO
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  ac34d5ad-25e1-4985-84bb-a4c80f1f8db5:
+    x: 8
+    description: check top client network egress connection ports
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 | RemoteAddressIP4=?ip-found-by-easm
+      | !cidr(RemoteAddressIP4, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | table([NetworkConnectIP4, RemotePort])
+      | groupBy([NetworkConnectIP4, RemotePort], function=count())
+      | sort(_count, order=desc)
+    visualization: bar-chart
+    end: now
+    start: 7d
+    width: 4
+    y: 10
+    interactions:
+    - conditions: null
+      name: Filter External Assets with Remote Port
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=port%3A{{
+        fields.RemotePort }}
+      openInNewTab: true
+      type: customlink
+    title: Top Ports to Outgoing Connections BarChart
+    isLive: false
+    type: query
+  ddba769d-143c-4612-bf9f-e51f433f83c7:
+    x: 0
+    description: check client the amount of DNS requests sent to domain and it's subdomains
+    height: 10
+    queryString: |-
+      #event_simpleName=DnsRequest | DomainName=?mydomain
+      | table([DomainName])
+      | groupBy([DomainName], function=count())
+      | sort(_count, order=desc)
+    end: now
+    start: 7d
+    width: 6
+    y: 15
+    interactions:
+    - conditions: null
+      name: Filter Domain/Subdomain
+      titleTemplate: null
+      useWidgetTimeWindow: true
+      type: updateparameters
+      arguments:
+        mydomain: '["{{ fields.DomainName }}"]'
+    options:
+      innerRadius: 0
+      maxSeriesCount: 10
+      series: {}
+      withLegendTitle: true
+    visualization: pie-chart
+    title: DNS Lookup Pie
+    isLive: false
+    type: query
+  e8f24eda-d7ed-4fa4-905f-a7152ed9bd7b:
+    x: 0
+    description: this pane displays a record individual DNS lookups for a specific
+      domain / subdomain query.
+    height: 5
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer])
+      | ExternalAgentIPAdress := rename(aip) | "DNS Resolved IP" := rename(IP4Records) | Platform := rename(event_platform) | AgentID := rename(aid) | ApplicationName := rename(ContextBaseFileName)
+    end: now
+    start: 7d
+    width: 12
+    y: 5
+    interactions:
+    - conditions:
+      - argument: --
+        fieldName: '{{ fields["DNS Resolved IP"] }}'
+        operator: not-equal
+      name: Check DNS Resolved IP with FEM
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=ip_address%3A%27{{
+        fields["DNS Resolved IP"] }}%27
+      openInNewTab: true
+      type: customlink
+    - conditions:
+      - argument: --
+        fieldName: '{{ fields["DNS Resolved IP"] }}'
+        operator: not-equal
+      name: Check DNS Resolved IP with Falcon Explorer
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/surface/explore/ip/{{ fields["DNS
+        Resolved IP"] }}/summary
+      openInNewTab: true
+      type: customlink
+    - conditions: null
+      name: Check Computer Details
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/managed?filter=hostname%3A%27{{
+        fields.ComputerName }}%27
+      openInNewTab: true
+      type: customlink
+    - conditions: null
+      name: Check Computer Path Analysis
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/attack-path-analysis/attack-paths?filter=asset.name%3A%27{{
+        fields.ComputerName }}%27
+      openInNewTab: true
+      type: customlink
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Domain Investigiation
+    isLive: false
+    type: query
+  7e1a7ad3-1fc9-40f9-8f17-ac0652bb0fac:
+    x: 0
+    description: check client network egress connection to a specific IP address found
+      by EASM.
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4
+      | RemoteAddressIP4=?ip-found-by-easm
+      | table([aip, ComputerName, event_platform, RemoteAddressIP4, RemotePort, ContextBaseFileName])
+      | default(field=[aip, ComputerName, event_platform, RemoteAddressIP4, RemotePort, ContextBaseFileName], value="--", replaceEmpty=true)
+      | ApplicationName := rename(ContextBaseFileName) | AgentID := rename(aip)
+    end: now
+    start: 7d
+    width: 8
+    y: 10
+    interactions:
+    - conditions: null
+      name: Check AgentID with FEM
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=ip_address%3A%27{{
+        fields.AgentID }}%27
+      openInNewTab: true
+      type: customlink
+    - conditions: null
+      name: Check DNS RemoteAddressIP4 with Falcon Explorer
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://falcon.crowdstrike.com/surface/explore/ip/{{ fields.RemoteAddressIP4
+        }}/summary
+      openInNewTab: true
+      type: customlink
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: IPAddress Investigiation
+    isLive: false
+    type: query
+  a5e3446e-6392-4395-a3d8-f3e86d2acecf:
+    x: 0
+    description: This pane will display a count of DNS lookups by Falcon sensors.  More
+      lookups equals higher asset confidence.
+    height: 5
+    queryString: |
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | "DNS Resolved IP" := rename(IP4Records)
+      | default(field=["DNS Resolved IP"], value="--", replaceEmpty=true)
+      | table([DomainName, aip, "DNS Resolved IP"])
+      | groupBy([DomainName, _count, "DNS Resolved IP"], function=count())
+      | sort(_count, order=desc)
+    end: now
+    start: 7d
+    width: 6
+    y: 0
+    interactions:
+    - conditions: null
+      name: Whois Search for Domain Name
+      urlEncodeArgs: true
+      titleTemplate: null
+      urlTemplate: https://www.whois.com/whois/{{ fields.DomainName }}
+      openInNewTab: true
+      type: customlink
+    - conditions: null
+      name: Investigate Domain/Subdomain
+      titleTemplate: null
+      useWidgetTimeWindow: true
+      type: updateparameters
+      arguments:
+        mydomain: '["{{ fields.DomainName }}"]'
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: External Domain Lookup
+    isLive: false
+    type: query
+  1ea7d3ba-f8ee-4868-a671-202aa435f01b:
+    x: 6
+    y: 0
+    description: This pane will display all of the domain usernames associated with
+      a falcon host.
+    height: 5
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer])
+      | join({#event_simpleName=UserLogon ComputerName=?computername}, field=ComputerName, key=ComputerName, include=[UserName])
+      | top([aid,ComputerName,UserName, ContextBaseFileName, DomainName], limit=10)
+      | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
+      | DNSRequestCount := rename(_count)
+    end: now
+    start: 7d
+    width: 6
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Falcon Host Account Lookup
+    isLive: false
+    type: query
+  7b9dbacb-949b-4924-abcd-5cf34bfcfa0b:
+    x: 6
+    height: 10
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer])
+      | sankey(source=ComputerName, target=DomainName)
+    visualization: sankey
+    end: now
+    start: 7d
+    width: 6
+    y: 15
+    interactions:
+    - conditions: null
+      name: Check Correlation
+      titleTemplate: null
+      useWidgetTimeWindow: true
+      type: updateparameters
+      arguments:
+        computername: '["{{ fields.source }}"]'
+        mydomain: '["{{ fields.target }}"]'
+    title: ComputerName Domain Top Correlations
+    isLive: false
+    type: query
+$schema: https://schemas.humio.com/dashboard/v0.16.0
+parameters:
+  computername:
+    label: Computer Name
+    query: '#event_simpleName=ProcessRollup2 |groupBy(ComputerName)'
+    timeInterval: 7d
+    useDashboardTimeIfSet: false
+    type: query
+    defaultValue: '*'
+    width: 1
+    order: 2
+    valueField: ComputerName
+  ip-found-by-easm:
+    label: IP Found by Falcon EASM
+    order: 1
+    type: text
+    defaultValue: '*'
+    width: 1
+  mydomain:
+    label: Domain To Search
+    query: '#event_simpleName=DnsRequest |groupBy(DomainName)'
+    timeInterval: 1d
+    useDashboardTimeIfSet: true
+    type: query
+    defaultValue: '*'
+    width: 1
+    order: 0
+    valueField: DomainName
