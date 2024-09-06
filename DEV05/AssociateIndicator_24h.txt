@@ -1,0 +1,16 @@
+// Create parameter for Agent ID; Get AssociateIndicator Events and ProcessRollup2 Events
+aid=?aid (#event_simpleName=AssociateIndicator OR #event_simpleName=ProcessRollup2)
+// Use selfJoinFilter to join events
+| selfJoinFilter(field=[aid, TargetProcessId], where=[{#event_simpleName=AssociateIndicator}, {#event_simpleName=ProcessRollup2}])
+// Create pretty process tree for ProcessRollup2 events
+| case {
+#event_simpleName="ProcessRollup2" | ExecutionChain:=format(format="%s → %s (%s)", field=[ParentBaseFileName, FileName, RawProcessId]);
+*;
+}
+// Use groupBy to aggregate
+| groupBy([aid, TargetProcessId], function=([count(aid, as=Occurrences), selectFromMin(field="@timestamp", include=[@timestamp]), collect([ComputerName, UserName, ExecutionChain, Tactic, Technique, DetectDescription, CommandLine])]))
+// Add Process Tree link to ease investigation; Uncomment your cloud
+| rootURL := "https://falcon.crowdstrike.com/"
+| format("[Process Explorer](%sgraphs/process-explorer/tree?id=pid:%s:%s)", field=["rootURL", "aid", "TargetProcessId"], as="Falcon")
+| drop([rootURL])
+| sort(@timestamp, order=desc, limit=20000)
