@@ -115,13 +115,11 @@ widgets:
     height: 5
     queryString: |-
       #event_simpleName=DnsRequest DomainName=?mydomain
-      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
-      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
-      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, DomainName], limit = 1000)
+      | table([aid, ComputerName, DomainName], limit = 10)
       | join({#event_simpleName=UserLogon}, field=ComputerName, key=ComputerName, include=[UserName])
-      | top([aid,ComputerName,UserName, ContextBaseFileName, DomainName], limit=10)
+      | UserName != "LOCAL SERVICE"
+      | top([aid,ComputerName,UserName, DomainName], limit=10)
       //. Uncomment this line to find only users that looks like user@domain.tld   | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
-      | ApplicationName := rename(ContextBaseFileName)
       | DNSRequestCount := rename(_count)
     end: now
     start: 7d
