@@ -21,8 +21,19 @@ process {
     $Json = Get-FalconHost -Filter "hostname:'$Target'" -Sort 'last_seen.desc' -Limit 1 -Verbose |
       Select-Object @{l='device_id';e={$_}},@{l='search';e={$true}} | ConvertTo-Json -Compress
     if (!$Json) { throw "Failed to create Json for workflow submission." }
-    $Execution = Invoke-FalconWorkflow -Name dev05_workflow -Json $Json -Verbose
-    if ($Execution) { Write-Host "Started Fusion workflow 'dev05_workflow'. [$Execution]" }
+    $Id = Invoke-FalconWorkflow -Name dev05_workflow -Json $Json -Verbose
+    if ($Id) {
+      Write-Host "Started Fusion workflow 'dev05_workflow'. [$Id]"
+      Write-Host "Waiting for results..."
+    }
+    do {
+      if ($Execution) { Write-Host "Trying again..." }
+      Start-Sleep -Seconds 10
+      $Execution = Get-FalconWorkflow -Id $Id -Execution -Verbose
+    } until ($Execution.status -eq 'Completed' -and $Execution.activities.status -contains 'Completed')
+    $Output = $Execution.activities.Where({$_.status -eq 'Completed'}).result.results
+    if (!$Output) { Write-Host "Workflow completed but 'AssociateIndicator' search produced no results." }
+    $Output
   } catch {
     throw $_
   }
