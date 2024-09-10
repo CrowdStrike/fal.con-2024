@@ -1,0 +1,182 @@
+name: External IP Address Owner Lookup
+updateFrequency: never
+description: External Domain Owner Lookup
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 7d
+widgets:
+  ac34d5ad-25e1-4985-84bb-a4c80f1f8db5:
+    x: 6
+    description: check top client network egress connection ports
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 | RemoteAddressIP4=?myip
+      | !cidr(RemoteAddressIP4, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | table([NetworkConnectIP4, RemotePort], limit = 1000)
+      | groupBy([NetworkConnectIP4, RemotePort], limit = 10, function=count())
+      | sort(_count, order=desc)
+    visualization: bar-chart
+    end: now
+    start: 7d
+    width: 6
+    y: 5
+    interactions:
+    - name: View External IP Address & Port Correlation
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=port%3A{{
+        fields.RemotePort }}%2Bip_address%3A%27{{ parameters.myip }}%27
+      openInNewTab: true
+      type: customlink
+    title: Top Ports to Outgoing Connections BarChart
+    isLive: false
+    type: query
+  ddba769d-143c-4612-bf9f-e51f433f83c7:
+    x: 0
+    description: This widget representing the top external IP addresses being accessed
+      by your endpoints.
+    height: 10
+    queryString: |
+      #event_simpleName=NetworkConnectIP4 | RemoteAddressIP4=?myip
+      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | table([RemoteAddressIP4], limit = 1000)
+      | groupBy([RemoteAddressIP4], limit = 1000, function=count())
+      | sort(_count, order=desc)
+    end: now
+    start: 7d
+    width: 6
+    y: 10
+    interactions:
+    - arguments:
+        myip: '["{{ fields.RemoteAddressIP4 }}"]'
+      name: Select External IP Address
+      type: updateparameters
+      useWidgetTimeWindow: true
+    options:
+      innerRadius: 0
+      maxSeriesCount: 10
+      series: {}
+      withLegendTitle: true
+    visualization: pie-chart
+    title: Top External IP Addresses
+    isLive: false
+    type: query
+  e8f24eda-d7ed-4fa4-905f-a7152ed9bd7b:
+    x: 0
+    description: This pane displays individual records of connections to external
+      IP addresses connection from your network.
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 RemoteAddressIP4=?myip
+      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | table([aip, ComputerName, event_platform, RemoteAddressIP4, RemotePort, ContextBaseFileName])
+      | default(field=[aip, ComputerName, event_platform, RemoteAddressIP4, RemotePort, ContextBaseFileName], value="--", replaceEmpty=true)
+    end: now
+    start: 7d
+    width: 6
+    y: 5
+    interactions:
+    - name: Check Remote IP Address
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=ip_address%253A'{{
+        fields.RemoteAddressIP4 }}'
+      openInNewTab: true
+      type: customlink
+    - name: View Managed Asset Attack Path Analysis
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/attack-path-analysis/attack-paths?filter=asset.name%3A%27{{
+        fields.ComputerName }}%27
+      openInNewTab: true
+      type: customlink
+    - name: View Managed ComputerName
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=confidence%253A!'25'%252Bip_address%253A'{{
+        fields.RemoteAddressIP4 }}'
+      openInNewTab: true
+      type: customlink
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: External IP Address Investigiation
+    isLive: false
+    type: query
+  a5e3446e-6392-4395-a3d8-f3e86d2acecf:
+    x: 0
+    description: This pane will display a count of egress connections by Falcon sensors
+      to external IP addresses.  More connections equals higher asset confidence they
+      related your organization if found by Falcon EASM.
+    height: 5
+    queryString: |
+      #event_simpleName=NetworkConnectIP4
+      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | top([ComputerName, RemoteAddressIP4], limit = 20)
+      | default(field=[ComputerName, RemoteAddressIP4], value="--", replaceEmpty=true)
+    end: now
+    start: 7d
+    width: 6
+    y: 0
+    interactions:
+    - arguments:
+        myip: '["{{ fields.RemoteAddressIP4 }}"]'
+      name: Select External IP Address
+      type: updateparameters
+      useWidgetTimeWindow: true
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: External IP Addresses
+    isLive: false
+    type: query
+  1ea7d3ba-f8ee-4868-a671-202aa435f01b:
+    x: 6
+    y: 0
+    description: This pane will display all of the usernames associated with a falcon
+      host.
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 RemoteAddressIP4=?myip
+      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, RemoteAddressIP4], limit = 1000)
+      | join({#event_simpleName=UserLogon}, field=ComputerName, key=ComputerName, include=[UserName])
+      | top([aid,ComputerName,UserName, ContextBaseFileName, RemoteAddressIP4], limit=10)
+      //. Uncomment this line to find only users that looks like user@domain.tld   | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
+      | ApplicationName := rename(ContextBaseFileName)
+      | DNSRequestCount := rename(_count)
+    end: now
+    start: 7d
+    width: 6
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Falcon Host Account Lookup
+    isLive: false
+    type: query
+  7b9dbacb-949b-4924-abcd-5cf34bfcfa0b:
+    x: 6
+    height: 10
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 RemoteAddressIP4=?myip
+      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | table([aip, ComputerName, event_platform, RemoteAddressIP4, RemotePort, ContextBaseFileName], limit = 15)
+      | sankey(source=ComputerName, target=RemoteAddressIP4)
+    visualization: sankey
+    end: now
+    start: 7d
+    width: 6
+    y: 10
+    interactions:
+    - arguments: {}
+      name: Select Domain / Subdomain
+      type: updateparameters
+      useWidgetTimeWindow: true
+    title: ComputerName External IP Top Correlations
+    isLive: false
+    type: query
+$schema: https://schemas.humio.com/dashboard/v0.17.0
