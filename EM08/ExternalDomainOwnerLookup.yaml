@@ -78,8 +78,7 @@ widgets:
     interactions:
     - name: View Managed ComputerName
       urlEncodeArgs: true
-      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=confidence%253A!'25'%252Bip_address%253A'{{
-        fields["DNS Resolved IP"] }}'
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/managed?filter=hostname%3A%27{{ fields.ComputerName }}%27
       openInNewTab: true
       type: customlink
     - name: View Managed Asset Attack Path Analysis
