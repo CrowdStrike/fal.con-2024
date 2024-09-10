@@ -1,0 +1,242 @@
+name: External Domain Owner Lookup
+description: External Domain Owner Lookup
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  ac34d5ad-25e1-4985-84bb-a4c80f1f8db5:
+    x: 6
+    description: Check top client network egress connection ports, click if you wish
+      to correlate a domain with external port open.
+    height: 5
+    queryString: |-
+      #event_simpleName=NetworkConnectIP4 | RemoteAddressIP4=*
+      | !cidr(RemoteAddressIP4, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | table([NetworkConnectIP4, RemotePort], limit = 1000)
+      | groupBy([NetworkConnectIP4, RemotePort], limit = 10, function=count())
+      | sort(_count, order=desc)
+    visualization: bar-chart
+    end: now
+    start: 7d
+    width: 6
+    y: 10
+    interactions:
+    - name: View Domain & Port Correlation
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=port%3A{{
+        fields.RemotePort }}%2Bfqdn%3A%27{{ parameters.mydomain }}%27
+      openInNewTab: true
+      type: customlink
+    title: Top Ports to Outgoing Connections BarChart
+    isLive: false
+    type: query
+  ddba769d-143c-4612-bf9f-e51f433f83c7:
+    x: 0
+    description: check client the amount of DNS requests sent to domain and it's subdomains.
+    height: 10
+    queryString: |-
+      #event_simpleName=DnsRequest | DomainName=?mydomain
+      | table([DomainName], limit = 1000)
+      | groupBy([DomainName], limit = 1000, function=count())
+      | sort(_count, order=desc)
+    end: now
+    start: 7d
+    width: 6
+    y: 15
+    interactions:
+    - arguments:
+        mydomain: '["{{ fields.DomainName }}"]'
+      name: Filter Domain / Subdomain
+      type: updateparameters
+      useWidgetTimeWindow: true
+    options:
+      innerRadius: 0
+      maxSeriesCount: 10
+      series: {}
+      withLegendTitle: true
+    visualization: pie-chart
+    title: Top DNS Lookup
+    isLive: false
+    type: query
+  e8f24eda-d7ed-4fa4-905f-a7152ed9bd7b:
+    x: 0
+    description: This pane displays individual records of DNS lookups for a specific
+      domain / subdomain query.
+    height: 5
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer], limit = 1000)
+      | ExternalAgentIPAdress := rename(aip) | "DNS Resolved IP" := rename(IP4Records) | Platform := rename(event_platform) | AgentID := rename(aid) | ApplicationName := rename(ContextBaseFileName)
+    end: now
+    start: 7d
+    width: 12
+    y: 5
+    interactions:
+    - name: View Managed ComputerName
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=confidence%253A!'25'%252Bip_address%253A'{{
+        fields["DNS Resolved IP"] }}'
+      openInNewTab: true
+      type: customlink
+    - name: View Managed Asset Attack Path Analysis
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/attack-path-analysis/attack-paths?filter=asset.name%3A%27{{
+        fields.ComputerName }}%27
+      openInNewTab: true
+      type: customlink
+    - name: View Domain / Subdomain
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/dns-domains?filter=confidence%253A!'25'%252Bfqdn%253A'{{
+        fields.DomainName }}'
+      openInNewTab: true
+      type: customlink
+    - name: Check External asset as DNS Resolved IP
+      urlEncodeArgs: true
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/external/ip-addresses?filter=confidence%253A!'25'%252Bip_address%253A'{{
+        fields["DNS Resolved IP"] }}'
+      openInNewTab: true
+      type: customlink
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Domain Investigiation
+    isLive: false
+    type: query
+  1ea7d3ba-f8ee-4868-a671-202aa435f01b:
+    x: 6
+    y: 0
+    description: This pane will display all of the domain usernames associated with
+      a falcon host.
+    height: 5
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, DomainName], limit = 1000)
+      | join({#event_simpleName=UserLogon}, field=ComputerName, key=ComputerName, include=[UserName])
+      | top([aid,ComputerName,UserName, ContextBaseFileName, DomainName], limit=10)
+      //. Uncomment this line to find only users that looks like user@domain.tld   | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
+      | ApplicationName := rename(ContextBaseFileName)
+      | DNSRequestCount := rename(_count)
+    end: now
+    start: 7d
+    width: 6
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Falcon Host Account Lookup
+    isLive: false
+    type: query
+  7b9dbacb-949b-4924-abcd-5cf34bfcfa0b:
+    x: 6
+    height: 10
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer], limit = 15)
+      | sankey(source=ComputerName, target=DomainName)
+    visualization: sankey
+    end: now
+    start: 7d
+    width: 6
+    y: 15
+    interactions:
+    - arguments:
+        mydomain: '["{{ fields.target }}"]'
+      name: Select Domain / Subdomain
+      type: updateparameters
+      useWidgetTimeWindow: true
+    title: ComputerName Domain Top Correlations
+    isLive: false
+    type: query
+  a5e3446e-6392-4395-a3d8-f3e86d2acecf:
+    x: 0
+    description: This pane will display a count of DNS lookups by Falcon sensors.  More
+      lookups equals higher asset confidence.
+    height: 5
+    queryString: |
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | "DNS Resolved IP" := rename(IP4Records)
+      | table([DomainName, aip], limit = 1000)
+      | groupBy([DomainName, _count], limit = 1000 ,function=count())
+      | sort(_count, order=desc)
+    end: now
+    start: 7d
+    width: 6
+    y: 0
+    interactions:
+    - name: Whois domain
+      urlEncodeArgs: true
+      urlTemplate: https://www.whois.com/whois/{{ fields.DomainName }}
+      openInNewTab: true
+      type: customlink
+    - arguments:
+        mydomain: '["{{ fields.DomainName }}"]'
+      name: Select Domain / Subdomain
+      type: updateparameters
+      useWidgetTimeWindow: true
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: External Domain Lookup
+    isLive: false
+    type: query
+  43fabdb2-c0dc-4ac0-a986-003eb24a5d1b:
+    x: 0
+    y: 10
+    description: This pane displays internal domain association confidence by the
+      amount of DNS lookups for a specific domain / subdomain from your internal network.
+    height: 5
+    queryString: |-
+      #event_simpleName=DnsRequest DomainName=?mydomain
+      | !cidr(IP4Records, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16"])
+      | table([DomainName], limit=300)
+      | count()
+    end: now
+    start: 7d
+    width: 6
+    options:
+      labels: []
+      padding: 0.02
+      trellisShowBorders: true
+      gaugeType: radialNeedle
+      thresholdConfig:
+        defaultColor: '#F2B0A6'
+        reversePalette: false
+        thresholds:
+        - color: '#F9E686'
+          value: 75
+        - color: '#91c569ff'
+          value: 100
+        - color: '#29a34bff'
+          value: 170
+      value-format: raw
+      range-max: 250
+    visualization: gauge
+    title: Internal domain association confidence
+    isLive: false
+    type: query
+$schema: https://schemas.humio.com/dashboard/v0.17.0
+parameters:
+  mydomain:
+    label: Domain To Search
+    query: '#event_simpleName=DnsRequest |groupBy(DomainName)'
+    timeInterval: 1d
+    useDashboardTimeIfSet: true
+    type: query
+    defaultValue: '*'
+    width: 1
+    order: 0
+    valueField: DomainName
