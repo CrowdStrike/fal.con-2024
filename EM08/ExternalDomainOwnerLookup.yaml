@@ -2,9 +2,9 @@ name: External Domain Owner Lookup
 description: External Domain Owner Lookup
 timeSelector: {}
 sharedTimeInterval:
-  enabled: false
+  enabled: true
   isLive: false
-  start: 1d
+  start: 7d
 widgets:
   ac34d5ad-25e1-4985-84bb-a4c80f1f8db5:
     x: 6
@@ -19,7 +19,7 @@ widgets:
       | sort(_count, order=desc)
     visualization: bar-chart
     end: now
-    start: 7d
+    start: 12h
     width: 6
     y: 10
     interactions:
@@ -48,7 +48,7 @@ widgets:
     interactions:
     - arguments:
         mydomain: '["{{ fields.DomainName }}"]'
-      name: Filter Domain / Subdomain
+      name: Select Domain / Subdomain
       type: updateparameters
       useWidgetTimeWindow: true
     options:
@@ -72,13 +72,14 @@ widgets:
       | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, ContextBaseFileName, DomainName, IP4Records, aip, RespondingDnsServer], limit = 1000)
       | ExternalAgentIPAdress := rename(aip) | "DNS Resolved IP" := rename(IP4Records) | Platform := rename(event_platform) | AgentID := rename(aid) | ApplicationName := rename(ContextBaseFileName)
     end: now
-    start: 7d
+    start: 6h
     width: 12
     y: 5
     interactions:
     - name: View Managed ComputerName
       urlEncodeArgs: true
-      urlTemplate: https://falcon.crowdstrike.com/discover/assets/managed?filter=hostname%3A%27{{ fields.ComputerName }}%27
+      urlTemplate: https://falcon.crowdstrike.com/discover/assets/managed?filter=hostname%3A%27{{
+        fields.ComputerName }}%27
       openInNewTab: true
       type: customlink
     - name: View Managed Asset Attack Path Analysis
@@ -99,6 +100,11 @@ widgets:
         fields["DNS Resolved IP"] }}'
       openInNewTab: true
       type: customlink
+    - arguments:
+        mydomain: '["{{ fields.DomainName }}"]'
+      name: Select Subdomain
+      type: updateparameters
+      useWidgetTimeWindow: true
     options:
       cell-overflow: wrap-text
       configured-columns: {}
@@ -115,18 +121,29 @@ widgets:
     height: 5
     queryString: |-
       #event_simpleName=DnsRequest DomainName=?mydomain
-      | table([aid, ComputerName, DomainName], limit = 10)
-      | join({#event_simpleName=UserLogon}, field=ComputerName, key=ComputerName, include=[UserName])
-      | UserName != "LOCAL SERVICE"
-      | top([aid,ComputerName,UserName, DomainName], limit=10)
-      //. Uncomment this line to find only users that looks like user@domain.tld   | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
+      | default(field=[IP4Records, RespondingDnsServer, ContextBaseFileName], value="--", replaceEmpty=true)
+      | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, DomainName], limit = 1000)
+      | join({#event_simpleName=/^(ServiceStarted|FirewallSetRule|EndOfProcess|AssociateIndicator|ScheduledTaskRegistered|UserLogoff|UserLogon)$/}, field=ComputerName, include=[UserName])
+      | !in(field=UserName, values=["LOCAL SERVICE", "DWM-1", "DWM-2", "EM08-C1$", "EM08-C2$", "EM08-S1$"])
+      | groupBy([aid,ComputerName,UserName, ContextBaseFileName, DomainName], limit=10)
+      | ApplicationName := rename(ContextBaseFileName)
       | DNSRequestCount := rename(_count)
+      | sort(DNSRequestCount)
     end: now
-    start: 7d
+    start: 3h
     width: 6
     options:
       cell-overflow: wrap-text
-      configured-columns: {}
+      configured-columns:
+        ComputerName:
+          render-as: value
+        UserName:
+          color:
+            defaultColor: '#126CC6FF'
+            reversePalette: false
+            thresholds: []
+          data-type: text
+          render-as: value
       row-numbers-enabled: false
     visualization: table-view
     title: Falcon Host Account Lookup
@@ -202,7 +219,7 @@ widgets:
       | table([DomainName], limit=300)
       | count()
     end: now
-    start: 7d
+    start: 12h
     width: 6
     options:
       labels: []
@@ -230,7 +247,7 @@ parameters:
   mydomain:
     label: Domain To Search
     query: '#event_simpleName=DnsRequest |groupBy(DomainName)'
-    timeInterval: 1d
+    timeInterval: 14d
     useDashboardTimeIfSet: true
     type: query
     defaultValue: '*'

@@ -9,7 +9,7 @@ sharedTimeInterval:
 widgets:
   ac34d5ad-25e1-4985-84bb-a4c80f1f8db5:
     x: 6
-    description: check top client network egress connection ports
+    description: This pane shows top client network egress connection ports.
     height: 5
     queryString: |-
       #event_simpleName=NetworkConnectIP4 | RemoteAddressIP4=?myip
@@ -105,7 +105,7 @@ widgets:
     type: query
   a5e3446e-6392-4395-a3d8-f3e86d2acecf:
     x: 0
-    description: This pane will display a count of egress connections by Falcon sensors
+    description: This pane displays a count of egress connections by Falcon sensors
       to external IP addresses.  More connections equals higher asset confidence they
       related your organization if found by Falcon EASM.
     height: 5
@@ -135,20 +135,21 @@ widgets:
   1ea7d3ba-f8ee-4868-a671-202aa435f01b:
     x: 6
     y: 0
-    description: This pane will display all of the usernames associated with a falcon
+    description: This pane displays all of the usernames associated with a falcon
       host.
     height: 5
     queryString: |-
       #event_simpleName=NetworkConnectIP4 RemoteAddressIP4=?myip
-      | !cidr(RemoteAddressIP4, subnet=["0.0.0.0", "10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
+      | !cidr(RemoteAddressIP4, subnet=["10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16", "192.254.0.0/16", "169.254.0.0/16"])
       | table([@timestamp, aid, ComputerName, event_platform, LocalAddressIP4, RemoteAddressIP4], limit = 1000)
-      | join({#event_simpleName=UserLogon}, field=ComputerName, key=ComputerName, include=[UserName])
-      | top([aid,ComputerName,UserName, ContextBaseFileName, RemoteAddressIP4], limit=10)
+      | join({#event_simpleName=/^(ServiceStarted|FirewallSetRule|EndOfProcess|AssociateIndicator|ScheduledTaskRegistered|UserLogoff|UserLogon)$/}, field=ComputerName, include=[UserName])
+      | !in(field=UserName, values=["LOCAL SERVICE", "DWM-1", "DWM-2", "EM08-C1$", "EM08-C2$", "EM08-S1$"])
+      | groupBy([aid,ComputerName,UserName, ContextBaseFileName, DomainName], limit=10)
       //. Uncomment this line to find only users that looks like user@domain.tld   | UserName = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
       | ApplicationName := rename(ContextBaseFileName)
-      | DNSRequestCount := rename(_count)
+      | EgressConnectionCount := rename(_count)
     end: now
-    start: 7d
+    start: 3h
     width: 6
     options:
       cell-overflow: wrap-text
@@ -180,3 +181,10 @@ widgets:
     isLive: false
     type: query
 $schema: https://schemas.humio.com/dashboard/v0.17.0
+parameters:
+  myip:
+    label: myip
+    order: 50
+    type: text
+    defaultValue: *
+    width: 1
