@@ -1,0 +1,29 @@
+---
+- name: Module - sensor_download example
+  hosts: sketchy-cat1
+  vars:
+    n_minus: 1  # This is basically version decrement (n-1, n-2, etc)
+  tasks:
+    - name: Build API filter based on sketchy-cat1
+      ansible.builtin.set_fact:
+        sensor_filter: "os:'{{ ansible_facts['distribution'] }}*'\
+          + os_version:'{{ ansible_facts['distribution_major_version'] }}'\
+          + architectures:'{{ ansible_facts['architecture'] }}'"
+
+    - name: Get list of filtered Falcon sensors
+      crowdstrike.falcon.sensor_download_info:
+        filter: "{{ sensor_filter }}"
+        sort: "version|desc"
+      register: installer_list
+      delegate_to: localhost
+
+    - name: Validate sensor request
+      ansible.builtin.fail:
+        msg: "No Falcon sensor was found! Something went wrong!"
+      when: installer_list.installers[0] is not defined
+
+    - name: Download the Falcon sensor installation package
+      crowdstrike.falcon.sensor_download:
+        hash: "{{ installer_list.installers[n_minus | int].sha256 }}"
+        dest: /tmp
+      delegate_to: localhost

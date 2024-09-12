@@ -1,0 +1,16 @@
+---
+- name: Debug host containment operations
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Set facts
+      ansible.builtin.set_fact:
+        formatted_time: "{{ '%Y-%m-%d %H:%M:%S' | strftime(utc_timestamp) }}"
+        fmt_operation: "{{ 'contain a host' if operation == 'containment_requested' else 'lift containment on a host' }}"
+
+    - name: Display message
+      ansible.builtin.debug:
+        msg:
+          - "At {{ formatted_time }}:"
+          - "A request to {{ fmt_operation }} was issued."
+          - "The request was issued to the following host ID: {{ host_id }}"

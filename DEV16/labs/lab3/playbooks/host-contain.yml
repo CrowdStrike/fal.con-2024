@@ -1,0 +1,42 @@
+---
+- name: Contain and alert on detection events
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    log_file: "/home/ubuntu/labs/lab3/logs/{{ computer_name }}.log"
+  tasks:
+    - name: Prepare format for event data
+      ansible.builtin.set_fact:
+        event_data: "{{ ansible_eda.event.falcon.event | to_nice_json }}"
+
+    - name: Log detection event
+      ansible.builtin.lineinfile:
+        path: "{{ log_file }}"
+        line: |
+          {{ lookup('pipe', 'date') }}
+          WARNING: A {{ severity_name }} Detection event detected on {{ computer_name }}!
+
+          Detection ID: {{ detection_id }}
+          Detection Description: {{ detection_description }}
+
+          Detection Event Data:
+          {{ event_data }}
+        create: true
+        mode: '0644'
+
+    - name: Log attempt to contain host
+      ansible.builtin.lineinfile:
+        path: "{{ log_file }}"
+        line: |
+          Attempting to contain the host...
+
+    - name: Host contain that bad boy!
+      crowdstrike.falcon.host_contain:
+        hosts: "{{ host_id }}"
+
+    - name: Log containment status
+      ansible.builtin.lineinfile:
+        path: "{{ log_file }}"
+        line: |
+          {{ computer_name }} was successfully contained.

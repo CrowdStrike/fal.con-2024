@@ -1,0 +1,30 @@
+---
+- name: Module - kernel_support_info example 2
+  hosts: localhost
+  gather_facts: false
+  vars:
+    access_token: "{{ lookup('file', '/tmp/falcon_token.json') }}"
+  tasks:
+    - name: Give me all x86_64 kernels supported for Amazon Linux
+      crowdstrike.falcon.kernel_support_info:
+        auth: "{{ access_token }}"
+        filter: "vendor:'amazon' + architecture:'x86_64'"
+      register: kernel_support
+
+    # Use Ansible to refine results
+    - name: Show the 5 newest kernels that have a base sensor package available
+      ansible.builtin.debug:
+        var: (
+              kernel_support.info |
+              selectattr('base_package_supported_sensor_versions') |
+              sort(true, attribute='release')
+              )[:5]
+
+    - name: Show the 2 newest Amazon 2 kernels with base sensor package available
+      ansible.builtin.debug:
+        var: (
+              kernel_support.info |
+              selectattr('distro', 'equalto', 'amzn2') |
+              selectattr('base_package_supported_sensor_versions') |
+              sort(true, attribute='release')
+              )[:2]

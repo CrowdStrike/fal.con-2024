@@ -1,0 +1,15 @@
+---
+- name: Host Unhide from dynamic inventory example
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create a list of aids from sketchy group
+      ansible.builtin.set_fact:
+        aids: "{{ aids | default([]) + [hostvars[item].device_id] }}"
+      loop: "{{ groups['sketchy'] }}"
+
+    - name: Unhide hosts from Falcon console
+      crowdstrike.falcon.host_hide:
+        hosts: "{{ item }}"
+        hidden: false
+      loop: "{{ aids }}"

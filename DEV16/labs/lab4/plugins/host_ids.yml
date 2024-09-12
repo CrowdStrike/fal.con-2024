@@ -1,0 +1,19 @@
+---
+- name: Plugin - host_ids lookup filter example
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Print all host IDs
+      ansible.builtin.debug:
+        msg: "{{ lookup('crowdstrike.falcon.host_ids', '') }}"
+
+    - name: Give me the details of hosts that haven't been seen in over 10 days
+      crowdstrike.falcon.host_info:
+        hosts: "{{ lookup('crowdstrike.falcon.host_ids', stale_filter) }}"
+      register: stale_hosts
+      vars:
+        stale_filter: 'last_seen:<="now-10d"'
+
+    - name: Print out stale hosts
+      ansible.builtin.debug:
+        var: stale_hosts.hosts

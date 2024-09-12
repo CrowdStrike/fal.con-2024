@@ -1,0 +1,5 @@
+localhost ansible_connection=local
+
+[sketchy_cats]
+sketchy-cat1 ansible_host=172.17.0.20 ansible_user=ec2-user
+sketchy-cat2 ansible_host=172.17.0.30 ansible_user=ec2-user
