@@ -1,0 +1,24 @@
+---
+- name: Host hide from lookup example
+  hosts: localhost
+  gather_facts: false
+  vars:
+    filter: 'hostname:"YOUR_ALIAS-sketchy*"'
+  tasks:
+    - name: Create a list of aids of our sketchy cats
+      ansible.builtin.set_fact:
+        aids: "{{ lookup('crowdstrike.falcon.host_ids', filter) }}"
+
+    - name: Hide hosts from Falcon console
+      crowdstrike.falcon.host_hide:
+        hosts: "{{ aids }}"
+        hidden: true
+
+    - name: Pause for a specified duration
+      ansible.builtin.pause:
+        prompt: "Hosts have been hidden. Press ENTER to continue and unhide the hosts"
+
+    - name: Unhide hosts from Falcon console
+      crowdstrike.falcon.host_hide:
+        hosts: "{{ aids }}"
+        hidden: false

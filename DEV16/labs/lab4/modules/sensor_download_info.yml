@@ -1,0 +1,14 @@
+---
+- name: Module - sensor_download_info example
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Get all Windows Sensor Installers sorted by version
+      crowdstrike.falcon.sensor_download_info:
+        filter: "platform:'windows'"
+        sort: "version|desc"
+      register: sensor_download_info
+
+    - name: Show the 2 most recent Windows Sensor Installers
+      ansible.builtin.debug:
+        var: sensor_download_info.installers[:2]

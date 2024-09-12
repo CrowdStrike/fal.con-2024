@@ -1,0 +1,7 @@
+---
+- name: Check if CrowdStrike Colletion is working
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Generate Authentication Credentials (access token and cloud region)
+      crowdstrike.falcon.auth:

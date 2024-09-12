@@ -1,0 +1,14 @@
+---
+- name: Module - auth
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Generate Authentication Credentials (access token and cloud region)
+      crowdstrike.falcon.auth:
+      register: token
+
+    - name: Save token to file for future use
+      ansible.builtin.copy:
+        content: "{{ token.auth }}"
+        dest: /tmp/falcon_token.json
+        mode: "0600"

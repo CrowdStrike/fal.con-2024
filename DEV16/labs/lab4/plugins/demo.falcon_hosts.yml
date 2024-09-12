@@ -1,0 +1,69 @@
+plugin: crowdstrike.falcon.falcon_hosts
+
+# authentication example using hashicorp vault lookup plugin
+# client_id: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=path/to/secret:client_id') }}"
+# client_secret: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=path/to/secret:client_secret') }}"
+# cloud: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=path/to/secret:cloud') }}"
+
+# return all Windows hosts (authentication via environment variables)
+# filter: "platform_name:'Windows'"
+
+# return all Linux hosts in reduced functionality mode
+# filter: "platform_name:'Linux' + reduced_functionality_mode:'yes'"
+
+# return stale devices that haven't checked in for 15 days
+# filter: "last_seen:<='now-15d'"
+
+# return all Linux hosts running in eBPF User Mode
+# filter: "linux_sensor_mode:'User Mode'"
+
+# place hosts into dynamically created groups based on variable values
+# keyed_groups:
+  # # places host in a group named tag_<tags> for each tag on a host
+  # - prefix: tag
+  #   key: tags
+  # # places host in a group named platform_<platform_name> based on the
+  # # platform name (Linux, Windows, etc.)
+  # - prefix: platform
+  #   key: platform_name
+  # # places host in a group named tag_<tags> for each tag on a host
+  # - prefix: rfm
+  #   key: reduced_functionality_mode
+
+# place hosts into dynamically created groups based on conditional statements
+groups:
+  sketchy: "'YOUR_ALIAS-sketchy' in hostname"
+  # # places hosts in a group named windows_hosts if the platform_name is Windows
+  # windows_hosts: "platform_name == 'Windows'"
+  # # place hosts in a group named aws_us_west_2 if the zone_group is in us-west-2
+  # aws_us_west_2: "'us-west-2' in zone_group and 'Amazon' in system_manufacturer"
+
+# compose inventory_hostname from Jinja2 expressions
+# hostnames:
+#   - hostname|lower
+
+# compose inventory_hostname from Jinja2 expressions with order of precedence
+# hostnames:
+#   - external_ip
+#   - local_ip
+#   - serial_number
+
+# use device_id as the inventory_hostname to prevent deduplication and set ansible_host
+# to a reachable attribute
+# hostnames:
+#   - device_id
+# compose:
+#   ansible_host: hostname | default(external_ip) | default(local_ip) | default(None)
+
+# compose connection variables for each host
+# compose:
+#   ansible_host: external_ip
+#   ansible_user: "'root'"
+#   ansible_ssh_private_key_file: "'/path/to/private_key_file'"
+
+# Use caching for the inventory
+cache: true
+cache_plugin: jsonfile
+cache_connection: /tmp/falcon_inventory
+cache_timeout: 1800
+cache_prefix: sketchy_hosts

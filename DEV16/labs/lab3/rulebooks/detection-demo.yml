@@ -1,0 +1,36 @@
+---
+- name: Example of working with Falcon detections
+  hosts: all
+  sources:
+    - crowdstrike.falcon.eventstream:
+        falcon_client_id: "{{ FALCON_CLIENT_ID }}"
+        falcon_client_secret: "{{ FALCON_CLIENT_SECRET }}"
+        falcon_cloud: "us-1"
+        latest: true
+        stream_name: "YOUR_ALIAS-example-2"
+        include_event_types:
+          - "DetectionSummaryEvent"
+          - "UserActivityAuditEvent"
+
+  rules:
+    - name: Host contain demo
+      condition: event.falcon.event.ComputerName is match('YOUR_ALIAS') and event.falcon.event.Severity > 3
+      action:
+        run_playbook:
+          name: playbooks/host-contain.yml
+          extra_vars:
+            computer_name: "{{ event.falcon.event.ComputerName }}"
+            detection_description: "{{ event.falcon.event.DetectDescription }}"
+            host_id: "{{ event.falcon.event.SensorId }}"
+            detection_id: "{{ event.falcon.event.DetectId }}"
+            severity_name: "{{ event.falcon.event.SeverityName }}"
+
+    - name: Respond to host containment activity
+      condition: event.falcon.event.OperationName is search('containment')
+      action:
+        run_playbook:
+          name: playbooks/debug-containment.yml
+          extra_vars:
+            utc_timestamp: "{{ event.falcon.event.UTCTimestamp }}"
+            host_id: "{{ event.falcon.event.Attributes.SensorId }}"
+            operation: "{{ event.falcon.event.OperationName }}"

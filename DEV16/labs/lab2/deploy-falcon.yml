@@ -1,0 +1,13 @@
+---
+- name: Deploy CrowdStrike Falcon against unmanaged assets
+  hosts: unmanaged_assets
+  vars:
+    falcon_client_id: "{{ lookup('env', 'FALCON_CLIENT_ID') }}"
+    falcon_client_secret: "{{ lookup('env', 'FALCON_CLIENT_SECRET') }}"
+  roles:
+    - name: Install Sensor
+      role: crowdstrike.falcon.falcon_install
+    - name: Configure Sensor
+      role: crowdstrike.falcon.falcon_configure
+      vars:
+        falcon_tags: "{{ lookup('env', 'MY_ALIAS') }}"

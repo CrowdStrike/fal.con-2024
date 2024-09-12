@@ -1,0 +1,23 @@
+---
+- name: Module - kernel_support_info example 1
+  hosts: sketchy-cat2
+  gather_facts: true
+  vars:
+    access_token: "{{ lookup('file', '/tmp/falcon_token.json') }}"
+  tasks:
+    - name: Get and set facts from sketchy-cat2
+      ansible.builtin.set_fact:
+        kernel: "{{ ansible_facts['kernel'] }}"
+        architecture: "{{ ansible_facts['architecture'] }}"
+
+    - name: Show support info using kernel and architecture from ansible_facts
+      crowdstrike.falcon.kernel_support_info:
+        auth: "{{ access_token }}"
+        filter: "release:'{{ kernel }}'+architecture:'{{ architecture }}'"
+      delegate_to: localhost
+
+    - name: Show support info for all Ubuntu 20 kernels that have a release starting with 5.8
+      crowdstrike.falcon.kernel_support_info:
+        auth: "{{ access_token }}"
+        filter: "vendor:'ubuntu'+distro:'ubuntu20'+release:*'5.8.*'"
+      delegate_to: localhost

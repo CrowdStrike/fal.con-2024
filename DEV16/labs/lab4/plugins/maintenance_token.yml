@@ -1,0 +1,9 @@
+---
+- name: Plugin - maintenance_token lookup filter example
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Loop through our trusty host_ids stale host and print any maintenance tokens
+      ansible.builtin.debug:
+        msg: "{{ lookup('crowdstrike.falcon.maintenance_token', item) }}"
+      loop: "{{ lookup('crowdstrike.falcon.host_ids', 'last_seen:<=\"now-10d\"') }}"
