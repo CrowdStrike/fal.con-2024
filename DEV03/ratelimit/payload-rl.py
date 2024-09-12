@@ -18,6 +18,8 @@ This lab demonstrates how to handle different payload types within the FalconPy 
 import socket
 from argparse import ArgumentParser, RawTextHelpFormatter
 import logging
+import time
+from secrets import choice
 from falconpy import APIHarnessV2, Detects, HostGroup
 
 
@@ -30,6 +32,17 @@ def query_string_parameters(debug_mode: bool = False):
     """
     print(query_string_parameters.__doc__)
     uber = APIHarnessV2(debug=debug_mode)   # Uber Class
+    # Check for rate limiting in our lab environment by forcing a login.
+    # Unlike a Service Class, the Uber Class does not authenticate until
+    # the first request is performed, or the login event is called.
+    uber.login()
+    while uber.token_status == 429:
+        # We hit the rate limit, inform the user and sleep for 1 to 5 seconds.
+        sleep_time = choice(range(1, 5))
+        print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+        time.sleep(sleep_time)
+        # Retry on rate limit failure
+        uber.login()
     detects = Detects(auth_object=uber)     # Detects Service Class
     # When we are not using abstraction, query string parameters must
     # be provided to the parameters keywords as a dictionary.

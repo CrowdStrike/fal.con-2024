@@ -17,6 +17,8 @@ This lab demonstrates authentication mechanisms supported by the FalconPy SDK.
 from argparse import ArgumentParser, RawTextHelpFormatter
 import logging
 import os
+import time
+from secrets import choice
 from falconpy import Hosts, HostGroup
 
 
@@ -31,7 +33,15 @@ def direct_authentication(debug_mode: bool = False, auth_only: bool = False):
 
     # Leverage the "client_id" and "client_secret" keywords for Direct Authentication
     hosts = Hosts(client_id=FALCON_CLIENT_ID, client_secret=FALCON_CLIENT_SECRET, debug=debug_mode)
-
+    while hosts.token_status == 429:
+        sleep_time = choice(range(1, 5))
+        print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+        time.sleep(sleep_time)
+        # Retry on rate limit failure
+        hosts = Hosts(client_id=FALCON_CLIENT_ID,
+                      client_secret=FALCON_CLIENT_SECRET,
+                      debug=debug_mode
+                      )
     if not auth_only:  # Run an API connectivity test for lab purposes
         response_direct = hosts.query_devices_by_filter_scroll()
         print(response_direct)
@@ -53,7 +63,12 @@ def credential_authentication(debug_mode: bool = False, auth_only: bool = False)
     }
     # Provide this dictionary to the "creds" keyword for Credential Authentication
     hosts = Hosts(creds=creds, debug=debug_mode)
-
+    while hosts.token_status == 429:
+        sleep_time = choice(range(1, 5))
+        print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+        time.sleep(sleep_time)
+        # Retry on rate limit failure
+        hosts = Hosts(creds=creds, debug=debug_mode)
     if not auth_only:  # Run an API connectivity test for lab purposes
         response_obj = hosts.query_devices_by_filter_scroll()
         print(response_obj)
@@ -71,7 +86,12 @@ def environment_authentication(debug_mode: bool = False, auth_only: bool = False
 
     # No keywords are required to use Environment Authentication
     hosts = Hosts(debug=debug_mode)
-
+    while hosts.token_status == 429:
+        sleep_time = choice(range(1, 5))
+        print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+        time.sleep(sleep_time)
+        # Retry on rate limit failure
+        hosts = Hosts(debug=debug_mode)
     if not auth_only:  # Run an API connectivity test for lab purposes
         response_env = hosts.query_devices_by_filter_scroll()
         print(response_env)
@@ -90,7 +110,12 @@ def object_authentication(debug_mode: bool = False, auth_only: bool = False):
     # The initial object leverages one of the other authentication styles,
     # eg. Direct, Credential, Environment.
     hosts = Hosts(debug=debug_mode)  # This example is using Environment Authentication
-
+    while hosts.token_status == 429:
+        sleep_time = choice(range(1, 5))
+        print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+        time.sleep(sleep_time)
+        # Retry on rate limit failure
+        hosts = Hosts(debug=debug_mode)
     # Subsequent objects can leverage a previously authenticated object
     host_group = HostGroup(auth_object=hosts)  # Provides the pre-existing Hosts object
     if not auth_only:  # Run an API connectivity test for lab purposes

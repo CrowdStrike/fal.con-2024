@@ -8,16 +8,18 @@ r"""
 |::.. . |                         |::.. . |         FalconPy Lab
 `-------'                         `-------'
 
-▄▄▄      ▄               ▀  █    ▀   █   ▀   ▄
-█▄▄ ▀▄▀ ▀█▀ ███ █▀█ █▀▀  █  █▀█  █   █   █  ▀█▀ █ █
-█▄▄ ▄▀▄  █▄ █▄▄ █ █ ▄▄█  █  █▄█  █   █▄  █   █▄ █▄█
-                                                ▄▄█
+▄▄▄      ▄  █            ▀          ▄▄▄          ▄
+█▄█ █ █ ▀█▀ █▀█ █▀█ █▀█  █  █▀▀     ▀▄  █ █ █▀█ ▀█▀ ▀▀█ ▀▄▀
+█   █▄█  █▄ █ █ █▄█ █ █  █  █▄▄     ▄▄█ █▄█ █ █  █▄ ███ ▄▀▄
+    ▄▄█                                 ▄▄█
 
-This lab demonstrates how to leverage extensible functionality within the FalconPy SDK.
+This lab demonstrates how to leverage pythonic response syntax when using the FalconPy SDK.
 """
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from typing import List, Dict, Union
 import logging
+import time
+from secrets import choice
 from falconpy import Hosts
 
 
@@ -27,16 +29,21 @@ from falconpy import Hosts
 class ExtendedHosts(Hosts):  # Inheriting from the Hosts Service Class
     """My custom Hosts Service Class."""
 
+    # Enable pythonic syntax by setting the pythonic attribute to True.
+    # You can also enable pythonics using any class by providing the
+    # "pythonic" keyword when you create an instance of the class.
+    pythonic = True
+
     def get_all_details(self) -> List[Dict[str, Union[str, int, Dict, List]]]:
         """Retrieve all hosts with extended details."""
         host_list = []
         offset = None
         total = 1
         while len(host_list) < total:
-            result = self.query_devices_by_filter_scroll(offset=offset)["body"]
-            total = result["meta"]["pagination"]["total"]
-            offset = result["meta"]["pagination"]["offset"]
-            host_list.extend(self.get_device_details(ids=result["resources"])["body"]["resources"])
+            result = self.query_devices_by_filter_scroll(offset=offset)
+            total = result.total
+            offset = result.offset
+            host_list.extend(self.get_device_details(ids=result.data))
         return host_list
 
     def list_all_hostnames(self) -> List[str]:
@@ -57,6 +64,14 @@ def run_lab_example(debug_mode: bool = False):
     #
     host_list = []
     with ExtendedHosts(debug=debug_mode) as hosts:
+        while hosts.token_status == 429:
+            # We hit the rate limit, inform the user and sleep for 1 to 5 seconds.
+            sleep_time = choice(range(1, 5))
+            print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+            time.sleep(sleep_time)
+            # Retry login on rate limit failure
+            hosts.login()
+
         host_list = hosts.list_all_hostnames()
         for hostname in host_list:
             print(hostname)

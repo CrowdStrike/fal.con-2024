@@ -17,7 +17,9 @@ This lab demonstrates how to leverage extensible functionality within the Falcon
 """
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from typing import List, Dict, Union
+from secrets import choice
 import logging
+import time
 from falconpy import Hosts
 
 
@@ -57,6 +59,14 @@ def run_lab_example(debug_mode: bool = False):
     #
     host_list = []
     with ExtendedHosts(debug=debug_mode) as hosts:
+        while hosts.token_status == 429:
+            # We hit the rate limit, inform the user and sleep for 1 to 5 seconds.
+            sleep_time = choice(range(1, 5))
+            print(f"Rate limit met, sleeping for {sleep_time} seconds.")
+            time.sleep(sleep_time)
+            # Retry login on rate limit failure
+            hosts.login()
+
         host_list = hosts.list_all_hostnames()
         for hostname in host_list:
             print(hostname)
