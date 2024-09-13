@@ -1,0 +1,159 @@
+name: Fal.Con 2024 - Anomaly Hunting - Abnormal
+updateFrequency: never
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  3765354c-6ff0-4b93-8ca7-bc0dbccfbbb4:
+    x: 0
+    y: 3
+    height: 3
+    queryString: |-
+      #event_simpleName=DnsRequest ContextBaseFileName=* ContextBaseFileName!=""
+      // for small environments, the line below can be removed but it's recommended to keep this focused on a specific process name, aid, or UserName
+      | ContextBaseFileName=powershell.exe
+      //ensure we have a DomainName to check against
+      | DomainLength := length("DomainName") | DomainLength>0
+      // remove some known long DNS names
+      | DomainName!=/in-addr.arpa$|windows.net$|live.com$|digicert.com$|microsoft.com$|oneclient.sfx.ms$|office.com$|.local$/i
+      // label our historical and current datasets to compare against.
+      | case {
+          test(@timestamp < (end() - duration(1d))) | DataSet:="Historical";
+          test(@timestamp > (end() - duration(1d))) | DataSet:="Current";
+          *}
+      // create our human readable time to group on
+      | humanTime := formatTime("%b %d", field=@timestamp, locale=en_US, timezone=Z)
+      // collect our dates, data set types (historical or current), and process name. then avg the DomainName length for each day
+      | groupBy([humanTime, DataSet, aid], function=[avg(DomainLength), collect([aid]), selectFromMax(field="DomainLength", include=[DomainName])], limit=200000)
+      // calculate our averages
+      | case {
+          DataSet="Historical" | rename(field="_avg", as="historicalAvg") | format("%s -> %s", field=[humanTime, DomainName], as="LongestHistoricalDomainName");
+          DataSet="Current" | rename(field="_avg", as="todaysAvg") | rename(field="DomainName", as="LongestCurrentDomainName");
+          *
+      }
+      // recollect together to compare current to historical
+      | groupBy([aid], function=[avg("historicalAvg", as=historicalAvg), avg("todaysAvg", as=todaysAvg), selectFromMax(field="historicalAvg", include=[LongestHistoricalDomainName]), selectFromMax(field="todaysAvg", include=[LongestCurrentDomainName])], limit=200000)
+      //collect([LongestHistoricalDomainName, LongestCurrentDomainName])], limit=200000)
+      //calculate the percentage increase
+      | PercentIncrease := todaysAvg / historicalAvg
+      | format("%d", field=PercentIncrease, as=PercentIncrease)
+      | format(format="%.2f", field=[historicalAvg], as=historicalAvg) | format(format="%.2f", field=[todaysAvg], as=todaysAvg)
+      | PercentIncrease > 0
+      | sort(PercentIncrease, limit=10000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Abnormally Long DomainName for Powershell
+    isLive: false
+    type: query
+  571e0927-860e-429a-a837-268b3aa63ac9:
+    x: 0
+    y: 6
+    height: 4
+    queryString: |-
+      #event_simpleName=ProcessRollup2
+      // for small environments, the line below can be removed but it's recommended to keep this focused on a specific process name, aid, or UserName
+      | aid=?aid
+      // label our historical and current datasets to compare against.
+      | case {
+          test(@timestamp < (end() - duration(1d))) | DataSet:="Historical";
+          test(@timestamp > (end() - duration(1d))) | DataSet:="Current";
+          *}
+      // // create our human readable time to group on
+      | humanTime := formatTime("%b %d", field=@timestamp, locale=en_US, timezone=Z)
+      // // collect our dates, data set types (historical or current), and process name. then avg the DomainName length for each day
+      | groupBy([humanTime, DataSet, FileName], function=[count(as=EventCount)], limit=200000)
+      // // calculate our averages. we average Current in case we decide to slide our Current window further back than 1day, ex. Current can be 7days to compare the whole week
+      | case {
+          DataSet="Historical" | rename(field="EventCount", as="historicalAvg");
+          DataSet="Current" | rename(field="EventCount", as="todaysAvg");
+          *
+      }
+      // // recollect together to compare current to historical
+      | groupBy([FileName], function=[avg("historicalAvg", as=historicalAvg), avg("todaysAvg", as=todaysAvg)], limit=200000)
+      // //calculate the percentage increase
+      | PercentIncrease := todaysAvg / historicalAvg
+      | format("%d", field=PercentIncrease, as=PercentIncrease)
+      | format(format="%.2f", field=[historicalAvg], as=historicalAvg) | format(format="%.2f", field=[todaysAvg], as=todaysAvg)
+      | PercentIncrease > 0
+      | sort(PercentIncrease, limit=10000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Abnormal Increase In Process Execution
+    isLive: false
+    type: query
+  e9aeb368-aa4f-4f3e-b900-d728b4318de4:
+    x: 0
+    y: 10
+    height: 4
+    queryString: |-
+      #event_simpleName=ProcessRollup2
+      // for small environments, the line below can be removed but it's recommended to keep this focused on a specific process name, aid, or UserName
+      | FileName=powershell.exe
+      //calculate our CommandLine length and ensure we have a CommandLine to check against
+      | CommandLength := length("CommandLine") | CommandLength>0
+      // label our historical and current datasets to compare against.
+      | case {
+          test(@timestamp < (end() - duration(1d))) | DataSet:="Historical";
+          test(@timestamp > (end() - duration(1d))) | DataSet:="Current";
+          *}
+      // create our human readable time to group on
+      | humanTime := formatTime("%b %d", field=@timestamp, locale=en_US, timezone=Z)
+      // collect our dates, data set types (historical or current), and aid. then avg the CommandLine length for each day
+      | groupBy([humanTime, DataSet, aid], function=[avg(CommandLength), collect([aid]), selectFromMax(field="CommandLength", include=[CommandLine])], limit=200000)
+      // calculate our averages
+      | case {
+          DataSet="Historical" | rename(field="_avg", as="historicalAvg") | format("%s -> %s", field=[humanTime, CommandLine], as="LongestHistoricalCommandLine");
+          DataSet="Current" | rename(field="_avg", as="todaysAvg") | rename(field="CommandLine", as="LongestCurrentCommandLine");
+          *
+      }
+      // recollect together to compare current to historical
+      | groupBy([aid], function=[avg("historicalAvg", as=historicalAvg), avg("todaysAvg", as=todaysAvg), selectFromMax(field="historicalAvg", include=[LongestHistoricalCommandLine]), selectFromMax(field="todaysAvg", include=[LongestCurrentCommandLine])], limit=200000)
+      // //calculate the percentage increase
+      | PercentIncrease := todaysAvg / historicalAvg
+      | format("%d", field=PercentIncrease, as=PercentIncrease)
+      | format(format="%.2f", field=[historicalAvg], as=historicalAvg) | format(format="%.2f", field=[todaysAvg], as=todaysAvg)
+      | PercentIncrease > 0
+      | sort(PercentIncrease, limit=10000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Abnormally Long Powershell Command Line
+    isLive: false
+    type: query
+  note-1726263120856-0:
+    x: 0
+    y: 0
+    height: 3
+    text: "We can use \"Abnormal\" to highlight anomalous behavior where an increase\
+      \ in volume, length, or amount is an indicator of suspicious activity. This\
+      \ is done by calculating this amount every day in our baseline (ex. 30 days)\
+      \ and our current data set. From there, we find the average amount over this\
+      \ baseline and compare that average to what we've seen today. Calculate a the\
+      \ percent increase and we can find scenarios where an activity or volume has\
+      \ doubled, tripled, or more. \n\nBelow are some examples to start with and build\
+      \ upon. \n\nFor more information and further updates, please refer to the [Logscale\
+      \ Community site](https://github.com/CrowdStrike/logscale-community-content/wiki).\
+      \  \n        "
+    width: 12
+    title: Fal.Con 2024 - Anomaly Hunting - "Abnormal"
+    type: note
+$schema: https://schemas.humio.com/dashboard/v0.17.0

@@ -1,0 +1,103 @@
+name: Fal.Con 2024 - Anomaly Hunting - First
+updateFrequency: never
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  984807dd-a9d0-47a1-993a-84e4c283574b:
+    x: 0
+    y: 3
+    height: 4
+    queryString: |-
+      #event_simpleName="ProcessRollup2"
+      | !selfJoinFilter(field=[FileName], where=[{test(@timestamp < (end() - duration(1d)))}])
+      | groupBy(FileName, limit=200000)
+    end: now
+    start: 7d
+    width: 6
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: First Execution of Process (30 day Baseline)
+    isLive: false
+    type: query
+  c4de4879-8aca-42a0-b85a-2e671245581d:
+    x: 0
+    y: 7
+    height: 6
+    queryString: |-
+      #event_simpleName=DnsRequest | ContextBaseFileName=* AND ContextBaseFileName!=""
+      // we want to filter on the uniqueness of two fields so we join them together as FullDNSConnect
+      | format(format="%s -> %s", field=[ContextBaseFileName, DomainName], as=FullDNSConnect)
+      // use our "First" filter on that unique string
+      | !selfJoinFilter(field=["FullDNSConnect"], where=[{test(@timestamp < (end() - duration(1d)))}])
+      // calculate the randomness of the Domain
+      | shannonEntropy("DomainName", as=DNSEntropy)
+      // compare those domains to our IOC feed for more enrichment
+      | ioc:lookup(field=[DomainName], type="domain", confidenceThreshold=unverified)
+      // include computer name to easily pinpoint the connection path
+      | format(format="%s -> %s", field=[ComputerName, DomainName], as=ConnectionName)
+      // aggregate by process name and count the number of hosts where this process has queried new domains for the first time
+      | groupBy(ContextBaseFileName, function=[collect([DomainName, DNSEntropy, "ioc[0].labels", ioc[0].malicious_confidence, ConnectionName]), count(aid, distinct=true, as=HostCount)], limit=200000)
+      | sort(ioc[0].labels, limit=10000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns:
+        DomainName:
+          width: 451
+      row-numbers-enabled: false
+    visualization: table-view
+    title: First DNS Request for Process with IOC and Entropy Enrichment (30day baseline))
+    isLive: false
+    type: query
+  c789fe60-8cbb-4eef-9669-80f8be75f8c3:
+    x: 6
+    y: 3
+    height: 4
+    queryString: |
+      #event_simpleName="NetworkConnectIP4"
+      | ContextBaseFileName=* AND ContextBaseFileName!=""
+      | ContextBaseFileName=/anydesk|teamviewer|screenconnect/i
+      | case {
+          #event_simpleName = "NetworkConnectIP4" | format(format="%s -> %s", field=[ContextBaseFileName, RemoteAddressIP4], as="Attempted Connection");
+          #event_simpleName = "DnsRequest" | format(format="%s -> %s", field=[ContextBaseFileName, DomainName], as="Attempted Connection");
+          *
+      }
+      | !selfJoinFilter(field=["Attempted Connection"], where=[{test(@timestamp < (end() - duration(7d)))}])
+      | groupBy(ContextBaseFileName, function=[collect(["Attempted Connection"]), count(aid, distinct=true, as=HostCount)], limit=200000)
+    end: now
+    start: 7d
+    width: 6
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: First Network Connection / DNS Request from RMM Tool (30day baseline, 7day
+      trigger window))
+    isLive: false
+    type: query
+  note-1726263120856-0:
+    x: 0
+    y: 0
+    height: 3
+    text: "We can use \"First\" to highlight anomalous behavior by comparing historical\
+      \ data to current data. We specify a subquery with end() - duration(1d) to create\
+      \ our baseline window then use selfJoinFilter to find data that exists in both\
+      \ the current data set and the baseline. By negating this (!selfJoinFilter),\
+      \ we exclude that data that exists in both, leaving only the data in the current\
+      \ data set that has not been seen in the baseline. \n\nBelow are some examples\
+      \ to start with and build upon. \n\nFor more information and further updates,\
+      \ please refer to the [Logscale Community site](https://github.com/CrowdStrike/logscale-community-content/wiki).\
+      \  \n        "
+    width: 12
+    title: Fal.Con 2024 - Anomaly Hunting - "First"
+    type: note
+$schema: https://schemas.humio.com/dashboard/v0.17.0

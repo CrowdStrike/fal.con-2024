@@ -1,0 +1,126 @@
+name: Fal.Con 2024 - Anomaly Hunting - Rare
+updateFrequency: never
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  6f71dba9-5411-485c-934f-36a312397c16:
+    x: 0
+    y: 7
+    height: 4
+    queryString: |-
+      // XZ CVE-2024-3094 - Rare executions spawned directly from an SSH process
+      // Look for any process execution where the parent process is SSH
+      #event_simpleName=ProcessRollup2
+      | ParentBaseFileName=/sshd/i
+      // Format the aid and ComputerName together.
+      | SensorName:=format(format="%s -> %s", field=[aid, ComputerName])
+      // We are looking for the CommandLine and tracking how many occurrences and the unique number of hosts we have seen this CommandLine on
+      | groupBy([FileName], function=[collect([ParentBaseFileName, CommandLine, SensorName], limit=100), count(aid, distinct=true, as=HostCount), count(as=EventCount)], limit=max)
+      // Find rare combinations that have occured on < 5 hosts.
+      | HostCount < 5
+      // Sort the results.
+      | sort([HostCount, EventCount], order=asc, limit=20000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Rare Spawned Process from SSH (xz CVE-2024-3094)
+    isLive: false
+    type: query
+  994f5569-11b1-458f-b5af-929674ccd0a5:
+    x: 0
+    y: 3
+    height: 4
+    queryString: |-
+      #event_simpleName=/NetworkConnectIP4|DnsRequest/
+      | ContextBaseFileName=* AND ContextBaseFileName!=""
+      // comment out the line below to include internal connections as well
+      | !cidr(RemoteAddressIP4, subnet=["224.0.0.0/4", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "0.0.0.0/32"])
+      // rewritting connections as unique strings. we add the aid in to filter on the uniqueness of process name, connection, and source host
+      | case {
+          #event_simpleName = "NetworkConnectIP4" | format(format="%s -> %s (%s)", field=[ContextBaseFileName, RemoteAddressIP4, aid], as="Attempted Connection");
+          #event_simpleName = "DnsRequest" | format(format="%s -> %s (%s)", field=[ContextBaseFileName, DomainName, aid], as="Attempted Connection");
+          *
+      }
+      // IP enrichment
+      | asn(RemoteAddressIP4)
+      | ipLocation(RemoteAddressIP4)
+      | ioc:lookup(field=[RemoteAddressIP4], type="ip_address", confidenceThreshold=unverified) | ioc:lookup(field=[DomainName], type="domain", confidenceThreshold=unverified)
+      // count how many unique connections each process has and how many unique hosts have made these connections
+      | groupBy(ContextBaseFileName, function=[count("Attempted Connection", distinct=true, as=UniqueConnectionCount), count(aid, distinct=true, as=HostCount), collect(["Attempted Connection", RemoteAddressIP4.org, ComputerName, aid, RemoteAddressIP4.country, ioc[0].malicious_confidence, ioc[0].labels], limit=100), count(as=NumConnectionsforProcess)], limit=200000)
+      // looking for rare connections
+      | UniqueConnectionCount < 5 HostCount < 5
+      // uncomment the following to whitelist ASNs, ex. CDNs
+      //| RemoteAddressIP4.org!=/microsoft|akamai/i
+      | sort("ioc[0].malicious_confidence", limit=20000)
+    end: now
+    start: 7d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Rare Network Connect for Process
+    isLive: false
+    type: query
+  c0122e16-1158-4a38-b4b6-4537cb5e4550:
+    x: 0
+    y: 11
+    height: 4
+    queryString: |-
+      // LOLBins - WMIC - Rare Remote Process Execution via WMIC
+      // https://www.crowdstrike.com/resources/white-papers/8-lolbins-every-threat-hunter-should-know/
+
+      // Look for any remote process execution via WMIC.
+      #event_simpleName=ProcessRollup2
+      | event_platform=Win ImageFileName=/wmic.exe/i CommandLine=/\/node:.* process call/i
+
+      // Extract the RemoteHost from the command line
+      | CommandLine=/\/node\:\"?(?<RemoteHost>.+?)[\s\"]/i
+
+      // Format the aid and ComputerName together.
+      | SensorName:=format(format="%s -> %s", field=[aid, ComputerName])
+
+      // For each CommandLine, collect the RemoteHosts, ComputerNames, while calculating the unique host count, remote host count, and the total event count
+      | groupBy(CommandLine, function=[collect([RemoteHost, SensorName]), count(aid, distinct=true, as=HostCount), count(RemoteHost, distinct=true, as=RemoteHostCount), count(as=EventCount)], limit=max)
+
+      // Sort the results.
+      | sort([HostCount, EventCount], order=asc, limit=20000)
+
+      // Find rare combinations that have occured on < 5 hosts.
+      | HostCount < 5
+    end: now
+    start: 30d
+    width: 12
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Rare Remote Process Executions via WMIC (LOLBins)
+    isLive: false
+    type: query
+  note-1726263120856-0:
+    x: 0
+    y: 0
+    height: 3
+    text: "We can use \"Rare\" to highlight anomalous behavior by comparing trends\
+      \ and activities across our environment. We can use groupBy() to aggregate activity\
+      \ and specify custom functions to count distinct hosts, distinct users, etc.\
+      \ From there, we can hunt on those counts to find activities that have occurred\
+      \ on only a small number of hosts.\n\nBelow are some examples to start with\
+      \ and build upon. \n\nFor more information and further updates, please refer\
+      \ to the [Logscale Community site](https://github.com/CrowdStrike/logscale-community-content/wiki).\
+      \  \n        "
+    width: 12
+    title: Fal.Con 2024 - Anomaly Hunting - "Rare"
+    type: note
+$schema: https://schemas.humio.com/dashboard/v0.17.0
